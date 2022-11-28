@@ -14,7 +14,11 @@ class MyPredictor(object):
     if kwargs.get('chunks'):
       return outputs.tolist()
     else:
-      return np.mean(outputs)
+      y_pred = outputs - 0.5
+      y_pred *= 2
+      weights = abs(y_pred)
+      weights -= 0.2
+      return (np.average(y_pred, weights=weights) / 2) + 0.5
 
   @classmethod
   def from_path(cls, model_dir):
