@@ -15,6 +15,7 @@ interface State {
   reset: boolean
 }
 
+
 class StAudioRec extends StreamlitComponentBase<State> {
   public state = { isFocused: false, recordState: null, audioDataURL: '', reset: false}
 
@@ -42,12 +43,19 @@ class StAudioRec extends StreamlitComponentBase<State> {
     return (
       <span>
         <div>
-          <button id='record' onClick={this.onClick_start}>
-            Start Recording
+
+        <button onClick={() => { this.state.recordState ? this.onClick_stop() : this.onClick_start()}}>
+          {this.state.recordState ? "Stop" : "Record"}
           </button>
+
+          {/* <button id='record' onClick={this.onClick_start}>
+            Start
+          </button>
+
           <button id='stop' onClick={this.onClick_stop}>
             Stop
-          </button>
+          </button> */}
+
           <button id='reset' onClick={this.onClick_reset}>
             Reset
           </button>
@@ -78,6 +86,7 @@ class StAudioRec extends StreamlitComponentBase<State> {
   }
 
 
+
   private onClick_start = () => {
     this.setState({
       reset: false,
@@ -98,7 +107,7 @@ class StAudioRec extends StreamlitComponentBase<State> {
     this.setState({
       reset: true,
       audioDataURL: '',
-      recordState: RecordState.STOP
+      recordState: RecordState.none
     })
     Streamlit.setComponentValue('')
   }
