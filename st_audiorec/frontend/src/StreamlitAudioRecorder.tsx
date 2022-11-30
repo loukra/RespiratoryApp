@@ -3,10 +3,11 @@ import {
   StreamlitComponentBase,
   withStreamlitConnection,
 } from "streamlit-component-lib"
-import React, { ReactNode } from "react"
-
+import React, { ReactNode, useState, useEffect } from "react"
 import AudioReactRecorder, { RecordState } from 'audio-react-recorder'
 import 'audio-react-recorder/dist/index.css'
+import { relative } from "path"
+
 
 interface State {
   isFocused: boolean
@@ -14,6 +15,7 @@ interface State {
   audioDataURL: string
   reset: boolean
 }
+
 
 class StAudioRec extends StreamlitComponentBase<State> {
   public state = { isFocused: false, recordState: null, audioDataURL: '', reset: false}
@@ -42,20 +44,20 @@ class StAudioRec extends StreamlitComponentBase<State> {
     return (
       <span>
         <div>
-          <button id='record' onClick={this.onClick_start}>
-            Start Recording
+          <button id='record' onClick={() => { this.state.recordState ? this.onClick_stop() : this.onClick_start()}}>
+          {this.state.recordState ? "Stop" : "Record"}
           </button>
-          <button id='stop' onClick={this.onClick_stop}>
+{/*           <button id='stop' onClick={this.onClick_stop}>
             Stop
           </button>
-          <button id='reset' onClick={this.onClick_reset}>
+         <button id='reset' onClick={this.onClick_reset}>
             Reset
           </button>
 
           <button id='continue' onClick={this.onClick_continue}>
             Download
           </button>
-
+      */}
           <AudioReactRecorder
             state={recordState}
             onStop={this.onStop_audio}
@@ -65,12 +67,13 @@ class StAudioRec extends StreamlitComponentBase<State> {
             canvasWidth={450}
             canvasHeight={100}
           />
-
+{/*
           <audio
             id='audio'
             controls
             src={this.state.audioDataURL}
           />
+   */}
 
         </div>
       </span>
@@ -78,14 +81,22 @@ class StAudioRec extends StreamlitComponentBase<State> {
   }
 
 
-  private onClick_start = () => {
+  private onClick_start = () => {     
     this.setState({
       reset: false,
       audioDataURL: '',
       recordState: RecordState.START
     })
     Streamlit.setComponentValue('')
+
+    setTimeout(() => {
+      this.setState({
+        reset: false,
+        recordState: RecordState.STOP
+      })
+    }, 17 * 1000);
   }
+  
 
   private onClick_stop = () => {
     this.setState({
