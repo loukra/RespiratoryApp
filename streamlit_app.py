@@ -4,7 +4,7 @@ import os
 import numpy as np
 import streamlit as st
 from io import BytesIO
-import streamlit.components.v1 as components
+import streamlit.components.v1 as com
 import io
 import soundfile as sf
 from matplotlib import pyplot as plt
@@ -16,7 +16,7 @@ import librosa
 
 
 # DESIGN implement changes to the standard streamlit UI/UX
-st.set_page_config(page_title="streamlit_audio_recorder")
+#st.set_page_config(page_title="streamlit_audio_recorder")
 # Design move app further up and remove top padding
 st.markdown('''<style>.css-1egvi7u {margin-top: -3rem;}</style>''',
     unsafe_allow_html=True)
@@ -29,67 +29,91 @@ st.markdown('''<style>.css-v37k9u a {color: #ff4c4b;}</style>''',
 st.markdown('''<style>.css-nlntq9 a {color: #ff4c4b;}</style>''',
     unsafe_allow_html=True)  # lightmode
 
-
-def audiorec_demo_app():
-
-    parent_dir = os.path.dirname(os.path.abspath(__file__))
-    # Custom REACT-based component for recording client audio in browser
-    build_dir = os.path.join(parent_dir, "st_audiorec/frontend/build")
-    # specify directory and initialize st_audiorec object functionality
-    st_audiorec = components.declare_component("st_audiorec", path=build_dir)
-
-    # TITLE and Creator information
-    st.title('RespiratorAI')
-    st.write('\n\n')
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+# Custom REACT-based component for recording client audio in browser
+build_dir = os.path.join(parent_dir, "st_audiorec/frontend/build")
+# specify directory and initialize st_audiorec object functionality
+st_audiorec = com.declare_component("st_audiorec", path=build_dir)
 
 
-    # STREAMLIT AUDIO RECORDER Instance
+with open('style.css') as f:
+    design = f.read()
+com.html(f"""
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+{
+design
+}
+</style>
+</head>
+<body>
+
+<div style="text-align:center">
+  <h1 style="font-family:Arial;color:">You Breath, We Classify</h1>
+  <span class="dot"></span>
+</div>
+
+</body>
+""")
+@st.cache(show_spinner=False, allow_output_mutation=True)
+def load_model():
+  return keras.models.load_model('ResNet.h5', compile=False)
+
+with st.sidebar:
+  st.title("Respiratory Health Classifier")
+  """This project is designed to detect whether your lungs are diseased or healthy. To do this, please record at least 8 seconds of your lung sounds. 
+  The artificial neural network will then analyse it and give you a result.\n\n
+  Please remember that this is not a medical diagnosis. 
+  If in doubt, it is best to seek a doctor's opinion. """
+
+
+col1, col2, col3 = st.columns([1,3,1])
+with col2:
+  if 'is_expanded' not in st.session_state:
+      st.session_state['is_expanded'] = True
+
+  holder = st.empty()
+  with holder:
     val = st_audiorec()
-    # web component returns arraybuffer from WAV-blob
-    st.write('Audio data received in the Python backend will appear below this message ...')
 
-    if isinstance(val, dict):  # retrieve audio data
-        with st.spinner('retrieving audio-recording...'):
-            ind, val = zip(*val['arr'].items())
-            ind = np.array(ind, dtype=int)  # convert to np array
-            val = np.array(val)             # convert to np array
-            sorted_ints = val[ind]
-            stream = BytesIO(b"".join([int(v).to_bytes(1, "big") for v in sorted_ints]))
-            wav_bytes = stream.read()
+  st.session_state['is_expanded'] = False
+  if isinstance(val, dict):
+    # retrieve audio data
+    ind, val = zip(*val['arr'].items())
+    ind = np.array(ind, dtype=int)  # convert to np array
+    val = np.array(val)             # convert to np array
+    sorted_ints = val[ind]
+    stream = BytesIO(b"".join([int(v).to_bytes(1, "big") for v in sorted_ints]))
+    audio_bytes = stream.read()
 
-        # wav_bytes contains audio data in format to be further processed
-        # display audio data as received on the Python side
-        st.audio(wav_bytes, format='audio/wav')
+    if audio_bytes:
+      data_origin, samplerate = sf.read(io.BytesIO(audio_bytes))
 
-        data_origin, samplerate = sf.read(io.BytesIO(wav_bytes))
-        
-        
-        #take only first channel
-        wav = data_origin[:,0]
+      wav = data_origin[:,0]
 
-        ### add resample to 4kHz here###
-        data = librosa.resample(wav, samplerate, 4000)   
+      data = librosa.resample(y=wav, orig_sr=samplerate, target_sr=4000)  
+          #create preprocessor object
+      print(data.shape)
+      if data.shape[0] > 16 * 4000:
+        holder.empty()
+        with st.spinner('Asking the Doc...'):
+            
+            preprocessor = preprocess.AudioPreprocessor()
 
-        fig, ax = plt.subplots()
-        ax.plot(wav)
-        ax.set_title(str(4000))
-        st.pyplot(fig)
+            #load model
+            model = load_model()
 
-        #create preprocessor object
-        preprocessor = preprocess.AudioPreprocessor()
-
-        #load model
-        model = keras.models.load_model('ResNet.h5', compile=False)
-
-        #create predictor object
-        predictor = predict.MyPredictor(model, preprocessor)
-
-        #predict file
-        y_pred = predictor.predict(wav)
-
-        st.write(y_pred, samplerate)
-
-if __name__ == '__main__':
-
-    # call main function
-    audiorec_demo_app()
+            #create predictor object
+            predictor = predict.MyPredictor(model, preprocessor)
+            fs_mult = np.floor(data.shape[0] / 4000)
+            #predict file
+            data = data[: int(4000 * fs_mult)]
+            print(data.shape)
+            y_pred = predictor.predict(data)
+        if y_pred > 0.5:
+          st.success(f"There is a higher probability of about {5 * round((y_pred * 100)/5)} % that your respiratory system is healthy")
+        else:
+          st.error(f"There is a higher probability of about {5 * round(((1 - y_pred) * 100)/5)} % that your respiratory system is diseased. ")
+      else: 
+        st.error("The recording must be at least 16 seconds long to obtain a result.")
