@@ -78,7 +78,7 @@ with col2:
 
   st.session_state['is_expanded'] = False
   if isinstance(val, dict):
-    holder.empty()  # retrieve audio data
+    # retrieve audio data
     ind, val = zip(*val['arr'].items())
     ind = np.array(ind, dtype=int)  # convert to np array
     val = np.array(val)             # convert to np array
@@ -88,10 +88,14 @@ with col2:
 
     if audio_bytes:
       data_origin, samplerate = sf.read(io.BytesIO(audio_bytes))
+
       wav = data_origin[:,0]
+
       data = librosa.resample(y=wav, orig_sr=samplerate, target_sr=4000)  
           #create preprocessor object
-      if data.shape[0] > 8 * 4000:
+      print(data.shape)
+      if data.shape[0] > 16 * 4000:
+        holder.empty()
         with st.spinner('Asking the Doc...'):
             
             preprocessor = preprocess.AudioPreprocessor()
@@ -101,16 +105,16 @@ with col2:
 
             #create predictor object
             predictor = predict.MyPredictor(model, preprocessor)
-
+            fs_mult = np.floor(data.shape[0] / 4000)
             #predict file
+            data = data[: int(4000 * fs_mult)]
+            print(data.shape)
             y_pred = predictor.predict(data)
         if y_pred > 0.5:
-          st.success(f"with a probability of {100 * y_pred:.0f} % your lung is healthy")
+          st.success(f"There is a higher probability of about {5 * round((y_pred * 100)/5)} % that your respiratory system is healthy")
         else:
-          st.error(f"with a probability of {100 - 100 * y_pred:.0f} % your lung is not healthy")
+          st.error(f"There is a higher probability of about {5 * round(((1 - y_pred) * 100)/5)} % that your respiratory system are diseased. ")
       else: 
-        st.error("The recording must be at least 8 seconds long to obtain a result.")
-      if st.button("Record again"):
-        pyautogui.hotkey("ctrl","F5")
+        st.error("The recording must be at least 16 seconds long to obtain a result.")
 
 
